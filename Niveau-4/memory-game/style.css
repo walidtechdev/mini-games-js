@@ -1,0 +1,57 @@
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: maroon;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 40px;
+
+  font-family: "Franklin Gothic Medium", "Arial Narrow", Arial, sans-serif;
+  color: aliceblue;
+  text-shadow: 0 0 4px black;
+}
+
+.memory__game {
+  width: auto;
+  height: 100%;
+  border: 2px solid black;
+  border-radius: 15px;
+  padding: 20px;
+
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(4, 1fr);
+  margin: auto;
+}
+
+.memory__card {
+  padding: 10px;
+  margin: auto;
+  transform: scale(1);
+
+  cursor: pointer;
+
+  transition: transform 0.5s;
+}
+
+.memory__card:active {
+  transform: scale(0.97);
+  transition: transform 0.2s;
+}
+
+img {
+  width: 150px;
+  height: 200px;
+
+  border-radius: 10px;
+}
+
+.front__card {
+  position: absolute;
+  display: none;
+}

@@ -1,0 +1,35 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+
+  background: goldenrod;
+}
+
+#dice {
+  border: 1px solid red;
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 500px;
+  height: 500px;
+  border-radius: 10px;
+}
+
+.dice__number {
+  position: absolute;
+}
+
+.hidden {
+  display: none;
+}

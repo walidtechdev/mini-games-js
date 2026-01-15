@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Color changer</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: rgb(142, 174, 174);
+        gap: 24px;
+      }
+
+      #color {
+        border: 1px solid black;
+        width: 250px;
+        height: 250px;
+      }
+
+      #btn {
+        border: none;
+        padding: 15px;
+        border-radius: 15px;
+        box-shadow: 0 0 3px black;
+        transition: transform 0.2s;
+        cursor: pointer;
+      }
+
+      #btn:active {
+        transform: scale(0.97);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Color Changes</h1>
+    <div id="color"></div>
+    <button id="btn">Change Color</button>
+    <script>
+      const color = document.getElementById("color");
+      const button = document.getElementById("btn");
+      let r, g, b;
+
+      button.addEventListener("click", function () {
+        colorChange();
+        color.style.backgroundColor = `rgb(${r},${g},${b})`; // backticks + ${}
+        console.log(r, g, b);
+      });
+
+      function colorChange() {
+        r = Math.floor(Math.random() * 256);
+        g = Math.floor(Math.random() * 256);
+        b = Math.floor(Math.random() * 256);
+      }
+    </script>
+  </body>
+</html>

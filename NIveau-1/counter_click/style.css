@@ -1,0 +1,86 @@
+@font-face {
+  font-family: "Saiyan";
+  src: url(font/Saiyan-Sans.ttf);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  background: url(images/wp8340174.png);
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+#container {
+  width: 350px;
+  height: 350px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+
+  padding: 100px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    white 0%,
+    /* Blanc pur au centre */ white 40%,
+    /* Garde le blanc jusqu'à 40% */ rgba(135, 206, 250, 0.8) 60%,
+    /* Bleu clair qui commence */ rgba(0, 100, 255, 0.9) 80%,
+    /* Bleu plus intense */ rgba(0, 50, 200, 1) 100% /* Bleu foncé au bord */
+  );
+
+  box-shadow: 0 0 30px rgba(135, 206, 250, 0.8),
+    /* Lueur externe bleue */ 0 0 60px rgba(135, 206, 250, 0.6),
+    /* Lueur plus large */ inset 0 0 30px rgba(255, 255, 255, 0.5); /* Lueur interne blanche */
+}
+
+.btn {
+  font-family: "Saiyan";
+  font-weight: 400;
+  color: rgb(201, 15, 15);
+  border: none;
+  border-radius: 10px;
+  padding: 20px;
+
+  font-size: 28px;
+
+  cursor: pointer;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn__count {
+  background: linear-gradient(#c07110, rgb(197, 174, 42));
+}
+.btn__reset {
+  background: linear-gradient(rgb(197, 174, 42), #c07110);
+}
+
+.count {
+  border: none;
+  border-radius: 5px;
+  font-size: 28px;
+  padding: 15px;
+
+  margin: auto;
+  font-weight: 700;
+}
+
+.btn__management {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 40px;
+}
