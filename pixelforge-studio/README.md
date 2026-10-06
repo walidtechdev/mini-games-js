@@ -10,54 +10,37 @@ Images live under `storage/`. SQLite (`storage/pixelforge.db`) stores projects, 
 
 ## What you need
 
-- Windows 10 or 11
-- Python 3.11 or newer, on PATH (`python --version`)
-- Node.js 20 or newer, on PATH (`node --version`)
-- A local ComfyUI install, normally at `http://127.0.0.1:8188`
+- Ubuntu with Python 3.11+ (`python3 --version`) and Node.js 20+ (`node --version`)
+- ComfyUI already installed and running on this machine, normally at `http://127.0.0.1:8188`
+
+PixelForge only talks to ComfyUI over HTTP. It does not install ComfyUI, ROCm, or drivers, and it does not use the GPU itself. The GPU belongs to your ComfyUI process. 16 GB of VRAM is enough for SDXL sprite workflows. Set the checkpoint filename in **Settings** to a file in that ComfyUI install's `models/checkpoints` folder (the default name is `v1-5-pruned-emaonly.safetensors`).
 
 ComfyUI is only required for AI generation (sprites, edits, directions, animation frames, upscale, background removal). Pixelize (algorithmic), the pixel editor, spritesheet export, and project/asset management work while ComfyUI is closed.
 
-## Setup and run (Windows)
+## Setup and run (Ubuntu)
 
 From this folder (`pixelforge-studio`):
 
-```bat
-start.bat
+```bash
+chmod +x start.sh
+./start.sh
 ```
 
-`start.bat` will:
+`start.sh` will:
 
 1. Copy `.env.example` to `.env` if you do not have one yet
-2. Create `backend\.venv` and install Python packages
+2. Create `backend/.venv` if it is missing and install Python packages
 3. Run `npm install` in `frontend` the first time
 4. Start the API at http://127.0.0.1:8787
 5. Start the UI at http://127.0.0.1:5173
 
-Open http://127.0.0.1:5173
+Open http://127.0.0.1:5173. Press Ctrl+C in that terminal to stop both processes.
 
-Start ComfyUI yourself, then in PixelForge open **Settings → Test ComfyUI Connection**. The button shows **Connected** or **Offline**. Set **Default model** to a checkpoint filename that exists in your ComfyUI `models/checkpoints` folder (the default is `v1-5-pruned-emaonly.safetensors`).
+Start ComfyUI yourself, then in PixelForge open **Settings → Test ComfyUI Connection**. The button shows **Connected** or **Offline**. On success, **GPU information** shows the device name and VRAM from ComfyUI `/system_stats`. If ComfyUI is down, that panel stays offline. Set **Default model** to your checkpoint filename and save.
 
 ### Run the two processes yourself
 
 API:
-
-```bat
-cd backend
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --host 127.0.0.1 --port 8787
-```
-
-UI (second terminal):
-
-```bat
-cd frontend
-npm install
-npm run dev
-```
-
-### macOS / Linux
 
 ```bash
 cd backend
@@ -67,19 +50,25 @@ pip install -r requirements.txt
 uvicorn app.main:app --host 127.0.0.1 --port 8787
 ```
 
+UI (second terminal):
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
+### Windows
+
+`start.bat` does the same setup and opens the API and UI in two command windows. The UI is still http://127.0.0.1:5173.
+
 ## Connect ComfyUI
 
-1. Start ComfyUI and confirm http://127.0.0.1:8188 loads.
+1. Start your existing ComfyUI and confirm http://127.0.0.1:8188 loads.
 2. Copy `.env.example` to `.env` if you have not already.
 3. Set `PIXEFORGE_COMFYUI_URL` if ComfyUI is not on port 8188.
 4. In the app, **Settings** stores the same URL, the checkpoint name, the storage directory, and the default workflow. Saved settings override `.env` after you click Save.
-5. **Test ComfyUI Connection** also reads GPU info from ComfyUI `/system_stats` when the server is up.
+5. **Test ComfyUI Connection** reads device name and VRAM from ComfyUI `/system_stats`. PixelForge does not run a GPU utility of its own.
 
 If a job cannot reach ComfyUI, the UI says: "ComfyUI is not running. Start ComfyUI and check that the configured address is correct." The developer panel (bottom bar) keeps the raw error.
 

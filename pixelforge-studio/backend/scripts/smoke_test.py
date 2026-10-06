@@ -21,6 +21,7 @@ os.environ["PIXEFORGE_COMFYUI_URL"] = "http://127.0.0.1:9"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app.comfy_client import gpu_summary  # noqa: E402
 from app.main import app  # noqa: E402
 from app.pixel_ops import cleanup_artifacts, pixelize_image, png_bytes  # noqa: E402
 
@@ -38,6 +39,30 @@ def wait_job(client: TestClient, job_id: str) -> dict:
 
 
 def main() -> None:
+    backend = ROOT
+    source = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in backend.rglob("*.py")
+        if "__pycache__" not in path.parts and "scripts" not in path.parts
+    )
+    assert "nvidia-smi" not in source
+    summary = gpu_summary(
+        {
+            "system": {"comfyui_version": "test", "pytorch_version": "2.4.0+rocm6.2"},
+            "devices": [
+                {
+                    "name": "cuda:0 AMD Radeon RX 7800 XT : native",
+                    "type": "cuda",
+                    "vram_total": 16 * 1024**3,
+                    "vram_free": 12 * 1024**3,
+                }
+            ],
+        }
+    )
+    assert summary["devices"][0]["name"] == "cuda:0 AMD Radeon RX 7800 XT : native"
+    assert summary["devices"][0]["vram_total"] == 16 * 1024**3
+    assert summary["pytorch"] == "2.4.0+rocm6.2"
+
     source = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
     for x in range(8):
         source.putpixel((x, 0), (200, 20, 20, 255))

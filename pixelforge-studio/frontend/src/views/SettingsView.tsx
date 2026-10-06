@@ -4,6 +4,15 @@ import { run, useStudio } from "../store";
 import type { Settings } from "../types";
 import { Button, TextInput } from "../components/ui";
 
+function formatVram(bytes: number | undefined): string {
+  if (bytes == null || !Number.isFinite(bytes)) return "unknown";
+  const gigabytes = bytes / 1024 ** 3;
+  if (gigabytes >= 0.1) return `${gigabytes.toFixed(1)} GB`;
+  const megabytes = bytes / 1024 ** 2;
+  if (megabytes >= 0.1) return `${Math.round(megabytes)} MB`;
+  return `${bytes} B`;
+}
+
 export function SettingsView() {
   const settings = useStudio((state) => state.settings);
   const workflows = useStudio((state) => state.workflows);
@@ -105,23 +114,31 @@ export function SettingsView() {
         </div>
       </form>
       <section className="mt-6 max-w-xl rounded-lg border border-line bg-panel p-4">
-        <h2 className="text-sm font-medium">ComfyUI</h2>
+        <h2 className="text-sm font-medium">GPU information</h2>
         <p className={`mt-1 text-sm ${comfyStatus === "Connected" ? "text-emerald-300" : comfyStatus === "Offline" ? "text-red-300" : "text-mist"}`}>
           {comfyStatus === "unknown" ? "Not tested yet" : comfyStatus}
         </p>
-        {gpu ? (
-          <div className="mt-2 text-xs text-mist">
+        {comfyStatus === "Connected" && gpu ? (
+          <div className="mt-2 space-y-2 text-xs text-mist">
+            <p>Read from ComfyUI /system_stats. PixelForge does not query the GPU itself.</p>
             <div>ComfyUI {gpu.comfyui_version || "unknown version"}</div>
             <div>PyTorch {gpu.pytorch || "—"}</div>
+            {gpu.devices.length === 0 ? <p>ComfyUI did not include a device in /system_stats.</p> : null}
             {gpu.devices.map((device, index) => (
               <div key={`${device.name ?? "device"}-${index}`}>
-                {device.name || device.type || "Device"}
-                {device.vram_total ? ` · VRAM ${device.vram_free ?? "?"}/${device.vram_total}` : ""}
+                <div className="text-sm text-slate-100">{device.name || "Unnamed device"}</div>
+                <div>
+                  VRAM {formatVram(device.vram_free)} free / {formatVram(device.vram_total)} total
+                </div>
               </div>
             ))}
           </div>
         ) : (
-          <p className="mt-2 text-xs text-mist">GPU info appears here when ComfyUI answers /system_stats.</p>
+          <p className="mt-2 text-xs text-mist">
+            {comfyStatus === "Offline"
+              ? "Offline. Start ComfyUI and check the configured address, then test again. GPU name and VRAM show up only after ComfyUI answers /system_stats."
+              : "Run Test ComfyUI Connection to load the device name and VRAM from ComfyUI."}
+          </p>
         )}
       </section>
     </div>

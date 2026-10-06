@@ -267,6 +267,12 @@ def _history_status(history: dict[str, Any], prompt_id: str) -> str:
 
 
 def gpu_summary(stats: dict[str, Any]) -> dict[str, Any]:
+    """Copy device name and VRAM from a ComfyUI /system_stats payload.
+
+    ComfyUI reports whatever PyTorch sees (NVIDIA, AMD/ROCm, or CPU). This
+    function only reads that JSON. It does not run a vendor tool.
+    VRAM fields are bytes, as ComfyUI sends them.
+    """
     devices = []
     for device in stats.get("devices") or []:
         if not isinstance(device, dict):
