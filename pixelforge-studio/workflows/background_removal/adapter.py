@@ -6,8 +6,8 @@ class Adapter(WorkflowAdapter):
     name = "Remove Background"
     description = (
         "Sends the sprite through workflows/background_removal/workflow.json. "
-        "The shipped graph expects the RMBG custom node. Export your own background-removal "
-        "graph from ComfyUI (API format) over this file and keep the __IMAGE__ and __FILENAME__ placeholders."
+        "The shipped graph still calls a node named RMBG. comfyui-rmbg and comfyui-inspyrenet-rembg "
+        "are on this machine, but their class names and input sockets were not verified, so the graph was left as-is."
     )
 
     def inputs_schema(self) -> list[dict]:

@@ -3,7 +3,7 @@
 Custom workflows can keep the same placeholders (`__PROMPT__`, `__NEGATIVE__`,
 `__MODEL__`, `__LORA__`, `__LORA_STRENGTH__`, `__SEED__`, `__STEPS__`, `__CFG__`,
 `__WIDTH__`, `__HEIGHT__`, `__SAMPLER__`, `__SCHEDULER__`, `__DENOISE__`,
-`__IMAGE__`, `__FILENAME__`, `__METHOD__`). An empty LoRA removes a LoraLoader
+`__IMAGE__`, `__FILENAME__`, `__METHOD__`, `__UPSCALE_MODEL__`). An empty LoRA removes a LoraLoader
 node and rewires its model/clip links so stock graphs stay valid.
 """
 
@@ -186,8 +186,8 @@ SCHEDULER_OPTIONS = ["normal", "karras", "simple", "exponential"]
 def common_sampler_fields() -> list[dict[str, Any]]:
     return [
         field("seed", "Seed", "number", default=-1, help="-1 rolls a new seed. The seed that ran is stored on the version."),
-        field("model", "Model", "string", default="", help="Checkpoint filename. Empty uses Settings."),
-        field("lora", "LoRA", "string", default="", help="LoRA filename. Empty skips the LoRA loader."),
+        field("model", "Model", "string", default="", help="Checkpoint from your ComfyUI install. Empty uses Settings."),
+        field("lora", "LoRA", "string", default="", help="LoRA from your ComfyUI install. Empty skips the LoRA loader."),
         field("lora_strength", "LoRA strength", "number", default=0.8, min=0, max=2, step=0.05),
         field("steps", "Steps", "number", default=20, min=1, max=150),
         field("cfg", "CFG", "number", default=7, min=1, max=30, step=0.5),
@@ -216,6 +216,7 @@ def diffusion_values(inputs: dict[str, Any], settings: dict[str, Any], filename:
         "FILENAME": filename,
         "IMAGE": inputs.get("comfy_image") or "pixelforge-input.png",
         "METHOD": inputs.get("method") or "nearest-exact",
+        "UPSCALE_MODEL": inputs.get("upscale_model") or "RealESRGAN_x4plus_anime_6B.pth",
     }
     return values, bool(lora)
 

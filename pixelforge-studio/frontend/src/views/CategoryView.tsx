@@ -14,11 +14,17 @@ export function CategoryView() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [categoryName, setCategoryName] = useState("");
+  const [standardPrompt, setStandardPrompt] = useState(project?.standard_prompt ?? "");
+  const patchProject = useStudio((state) => state.patchProject);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (projectId && project?.id !== projectId) void run(() => openProject(projectId));
   }, [projectId, project?.id, openProject]);
+
+  useEffect(() => {
+    setStandardPrompt(project?.standard_prompt ?? "");
+  }, [project?.id, project?.standard_prompt]);
 
   const category = project?.categories.find((item) => item.slug === categorySlug);
   const visible = assets.filter((asset) => asset.category_id === category?.id);
@@ -30,6 +36,23 @@ export function CategoryView() {
     <div className="h-full overflow-auto p-6">
       <div className="text-xs uppercase tracking-wider text-mist">{project.name}</div>
       <h1 className="text-2xl font-semibold">{category.name}</h1>
+      <label className="mt-4 block max-w-xl text-xs text-mist">
+        Project standard prompt
+        <TextArea className="mt-1" rows={3} value={standardPrompt} onChange={(event) => setStandardPrompt(event.target.value)} />
+        <span className="mt-1 block text-[11px]">Saved on the project and used for every character.</span>
+        <Button
+          className="mt-2"
+          type="button"
+          onClick={() =>
+            void run(async () => {
+              const updated = await api.updateProject(project.id, { standard_prompt: standardPrompt });
+              patchProject(updated);
+            })
+          }
+        >
+          Save standard prompt
+        </Button>
+      </label>
       <form
         className="mt-4 flex max-w-xl flex-col gap-2"
         onSubmit={(event) => {

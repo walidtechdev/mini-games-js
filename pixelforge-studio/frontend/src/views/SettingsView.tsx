@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { run, useStudio } from "../store";
 import type { Settings } from "../types";
-import { Button, TextInput } from "../components/ui";
+import { optionsWithCurrent } from "../lib/images";
+import { Button, SelectInput, TextInput } from "../components/ui";
 
 function formatVram(bytes: number | undefined): string {
   if (bytes == null || !Number.isFinite(bytes)) return "unknown";
@@ -19,6 +20,8 @@ export function SettingsView() {
   const projects = useStudio((state) => state.projects);
   const setSettings = useStudio((state) => state.setSettings);
   const setComfy = useStudio((state) => state.setComfy);
+  const models = useStudio((state) => state.models);
+  const refreshModels = useStudio((state) => state.refreshModels);
   const comfyStatus = useStudio((state) => state.comfyStatus);
   const gpu = useStudio((state) => state.gpu);
   const [draft, setDraft] = useState<Settings | null>(settings);
@@ -44,12 +47,18 @@ export function SettingsView() {
           void run(async () => {
             const saved = await api.saveSettings(draft);
             setSettings(saved);
+            await refreshModels();
           });
         }}
       >
         <label className="text-xs text-mist">
           ComfyUI URL
           <TextInput className="mt-1" value={draft.comfyui_url} onChange={(event) => update({ comfyui_url: event.target.value })} />
+        </label>
+        <label className="text-xs text-mist">
+          ComfyUI install path
+          <TextInput className="mt-1" value={draft.comfyui_path} onChange={(event) => update({ comfyui_path: event.target.value })} />
+          <span className="mt-1 block text-[11px]">Used to list checkpoints and LoRAs when ComfyUI is not answering. Default is /mnt/.storage/ComfyUI.</span>
         </label>
         <label className="text-xs text-mist">
           Storage directory
@@ -67,11 +76,36 @@ export function SettingsView() {
         </label>
         <label className="text-xs text-mist">
           Default model
-          <TextInput className="mt-1" value={draft.default_model} onChange={(event) => update({ default_model: event.target.value })} />
+          <SelectInput className="mt-1" value={draft.default_model} onChange={(event) => update({ default_model: event.target.value })}>
+            <option value="">Not set</option>
+            {optionsWithCurrent(models?.checkpoints ?? [], draft.default_model)
+              .filter((name) => name !== "")
+              .map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+          </SelectInput>
         </label>
         <label className="text-xs text-mist">
           Default LoRA
-          <TextInput className="mt-1" value={draft.default_lora} onChange={(event) => update({ default_lora: event.target.value })} />
+          <SelectInput className="mt-1" value={draft.default_lora} onChange={(event) => update({ default_lora: event.target.value })}>
+            <option value="">None</option>
+            {optionsWithCurrent(models?.loras ?? [], draft.default_lora)
+              .filter((name) => name !== "")
+              .map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+          </SelectInput>
+          <span className="mt-1 block text-[11px]">
+            {models?.source === "comfyui"
+              ? "Listed from ComfyUI /models/checkpoints and /models/loras."
+              : models
+                ? `ComfyUI did not answer. Listed from ${models.install_path}.`
+                : "The model list loads after Settings opens."}
+          </span>
         </label>
         <div className="grid grid-cols-2 gap-2">
           <label className="text-xs text-mist">
@@ -106,6 +140,7 @@ export function SettingsView() {
               void run(async () => {
                 const result = await api.testComfy();
                 setComfy(result.status, result.gpu);
+                await refreshModels();
               }).finally(() => setTesting(false));
             }}
           >

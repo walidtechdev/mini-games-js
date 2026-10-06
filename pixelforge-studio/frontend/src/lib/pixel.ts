@@ -225,6 +225,15 @@ export class PixelBuffer {
     return blob;
   }
 
+  static async fromFile(file: Blob): Promise<PixelBuffer> {
+    const url = URL.createObjectURL(file);
+    try {
+      return await PixelBuffer.fromUrl(url);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
   static async fromUrl(url: string): Promise<PixelBuffer> {
     const image = new Image();
     image.src = url;

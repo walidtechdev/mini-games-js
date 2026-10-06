@@ -37,6 +37,7 @@ export type Project = {
   name: string;
   slug: string;
   description: string;
+  standard_prompt: string;
   created_at: string;
   updated_at: string;
 };
@@ -175,6 +176,7 @@ export type Job = {
 
 export type Settings = {
   comfyui_url: string;
+  comfyui_path: string;
   storage_dir: string;
   default_workflow: string;
   default_model: string;
@@ -198,6 +200,13 @@ export type GpuInfo = {
   comfyui_version?: string;
   pytorch?: string;
   devices: GpuDevice[];
+};
+
+export type ModelCatalog = {
+  source: "comfyui" | "disk";
+  checkpoints: string[];
+  loras: string[];
+  install_path: string;
 };
 
 export type DevLog = {

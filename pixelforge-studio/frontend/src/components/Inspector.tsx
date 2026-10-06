@@ -4,6 +4,7 @@ import { formatWhen, versionLabel } from "../lib/format";
 import { run, useStudio } from "../store";
 import type { ReferenceImage } from "../types";
 import { REFERENCE_LABELS } from "../types";
+import { DropImage } from "./DropImage";
 import { Button, SelectInput } from "./ui";
 
 export function Inspector() {
@@ -85,24 +86,17 @@ export function Inspector() {
                   </option>
                 ))}
               </SelectInput>
-              <label className="shrink-0">
-                <input
-                  className="hidden"
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    if (!file) return;
-                    void run(async () => {
-                      await api.uploadReference(asset.id, file, label);
-                      await refreshAsset();
-                    });
-                  }}
-                />
-                <span className="inline-block cursor-pointer rounded-md border border-line bg-raised px-3 py-1.5 text-sm">Upload</span>
-              </label>
             </div>
+            <DropImage
+              className="mb-2"
+              label="Drop a reference, or choose a file"
+              onFile={(file) =>
+                void run(async () => {
+                  await api.uploadReference(asset.id, file, label);
+                  await refreshAsset();
+                })
+              }
+            />
             <div className="grid grid-cols-3 gap-2">
               {asset.references.map((reference) => (
                 <ReferenceThumb key={reference.id} reference={reference} onDelete={() => void run(async () => {

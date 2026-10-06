@@ -21,12 +21,13 @@ class EnvSettings(BaseSettings):
     )
 
     comfyui_url: str = "http://127.0.0.1:8188"
+    comfyui_path: str = "/mnt/.storage/ComfyUI"
     storage_dir: str = "storage"
     database_path: str = ""
     host: str = "127.0.0.1"
     port: int = 8787
-    default_model: str = "v1-5-pruned-emaonly.safetensors"
-    default_lora: str = ""
+    default_model: str = "pixelArtDiffusionXL_spriteShaper.safetensors"
+    default_lora: str = "pixel-art-xl-v1.1.safetensors"
     default_width: int = 512
     default_height: int = 512
     default_steps: int = 20

@@ -5,6 +5,7 @@ import type {
   DevLog,
   GpuInfo,
   Job,
+  ModelCatalog,
   Project,
   ProjectDetail,
   ReferenceImage,
@@ -44,6 +45,8 @@ export const api = {
   createProject: (name: string, description: string) =>
     request<ProjectDetail>("/api/projects", { method: "POST", body: JSON.stringify({ name, description }) }),
   project: (id: string) => request<ProjectDetail>(`/api/projects/${id}`),
+  updateProject: (id: string, body: { name?: string; description?: string; standard_prompt?: string }) =>
+    request<ProjectDetail>(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteProject: (id: string) => request<{ ok: boolean }>(`/api/projects/${id}`, { method: "DELETE" }),
   createCategory: (projectId: string, name: string, assetType: string) =>
     request<Category>(`/api/projects/${projectId}/categories`, {
@@ -131,5 +134,6 @@ export const api = {
       "/api/settings/test-comfy",
       { method: "POST" },
     ),
+  comfyModels: () => request<ModelCatalog>("/api/comfy/models"),
   logs: () => request<DevLog[]>("/api/logs"),
 };

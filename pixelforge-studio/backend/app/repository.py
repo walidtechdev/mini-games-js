@@ -176,6 +176,7 @@ def effective_settings() -> dict[str, Any]:
     storage = str(pick("storage_dir", env.storage_dir))
     return {
         "comfyui_url": str(pick("comfyui_url", env.comfyui_url)).rstrip("/"),
+        "comfyui_path": str(pick("comfyui_path", env.comfyui_path)),
         "storage_dir": storage,
         "default_workflow": str(pick("default_workflow", env.default_workflow)),
         "default_model": str(pick("default_model", env.default_model)),
@@ -192,6 +193,7 @@ def effective_settings() -> dict[str, Any]:
 def save_settings(values: dict[str, Any]) -> dict[str, Any]:
     allowed = {
         "comfyui_url",
+        "comfyui_path",
         "storage_dir",
         "default_workflow",
         "default_model",
@@ -221,6 +223,7 @@ def seed() -> None:
         env = get_env()
         defaults = {
             "comfyui_url": env.comfyui_url,
+            "comfyui_path": env.comfyui_path,
             "storage_dir": env.storage_dir,
             "default_workflow": env.default_workflow,
             "default_model": env.default_model,
@@ -235,6 +238,16 @@ def seed() -> None:
         with db.transaction() as conn:
             for key, value in defaults.items():
                 conn.execute("INSERT INTO settings (key, value) VALUES (?, ?)", (key, value))
+    # The first build stored a checkpoint name that is not on this machine.
+    if get_setting("default_model") == "v1-5-pruned-emaonly.safetensors":
+        env = get_env()
+        db.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            ("default_model", env.default_model),
+        )
+    if get_setting("comfyui_path") is None:
+        env = get_env()
+        db.execute("INSERT INTO settings (key, value) VALUES (?, ?)", ("comfyui_path", env.comfyui_path))
     existing = db.query_one("SELECT COUNT(*) AS n FROM styles")
     if existing and int(existing["n"]) == 0:
         stamp = now()
@@ -304,6 +317,7 @@ def mirror_project(project_id: str) -> None:
             "name": project["name"],
             "slug": project["slug"],
             "description": project["description"],
+            "standard_prompt": project.get("standard_prompt") or "",
             "categories": [c["slug"] for c in categories],
             "updated_at": project["updated_at"],
         },
@@ -432,6 +446,7 @@ def job_out(row: dict[str, Any]) -> dict[str, Any]:
         "prompt_id": row["prompt_id"],
         "error": row["error"],
         "raw_log": row["raw_log"],
+        "params": json.loads(row["params_json"] or "{}") if "params_json" in row.keys() else {},
         "batch_id": row["batch_id"],
         "label": row["label"],
         "created_at": row["created_at"],
@@ -468,6 +483,23 @@ def create_project(name: str, description: str = "") -> dict[str, Any]:
                 """,
                 (new_id(), project_id, cat_name, cat_slug, asset_type, index, stamp),
             )
+    mirror_project(project_id)
+    return get_project(project_id)
+
+
+def update_project(project_id: str, fields: dict[str, Any]) -> dict[str, Any]:
+    current = get_project(project_id)
+    name = fields.get("name", current["name"])
+    description = fields.get("description", current["description"])
+    standard_prompt = fields.get("standard_prompt", current.get("standard_prompt") or "")
+    get_db().execute(
+        """
+        UPDATE projects
+        SET name = ?, description = ?, standard_prompt = ?, updated_at = ?
+        WHERE id = ?
+        """,
+        (str(name).strip(), str(description), str(standard_prompt), now(), project_id),
+    )
     mirror_project(project_id)
     return get_project(project_id)
 
@@ -1113,25 +1145,41 @@ def delete_style(style_id: str) -> None:
 
 
 def apply_style(inputs: dict[str, Any], style_id: str | None) -> dict[str, Any]:
+    """Attach the style name. Sampler defaults are applied only when the UI asks."""
     merged = dict(inputs)
     if not style_id:
         return merged
-    style = style_out(get_style(style_id))
-    prefix = (style["prompt_prefix"] or "").strip()
-    prompt = str(merged.get("prompt") or "")
-    if prefix and prefix not in prompt:
-        merged["prompt"] = f"{prefix}, {prompt}".strip(", ")
+    try:
+        style = style_out(get_style(style_id))
+    except KeyError:
+        return merged
     if not str(merged.get("negative_prompt") or "").strip():
         merged["negative_prompt"] = style["negative_prompt"]
-    for key in ("model", "lora", "steps", "cfg", "width", "height"):
-        current = merged.get(key)
-        if current in (None, "", 0) and style.get(key) not in (None, ""):
-            merged[key] = style[key]
-    if not merged.get("lora_strength") and style.get("lora_strength"):
-        merged["lora_strength"] = style["lora_strength"]
     merged["style_id"] = style_id
     merged["style_name"] = style["name"]
     return merged
+
+
+def compose_prompt(asset: dict[str, Any], style_id: str | None) -> str:
+    """Style prefix, then the project standard prompt, then the asset description."""
+    parts: list[str] = []
+    if style_id:
+        try:
+            style = style_out(get_style(style_id))
+        except KeyError:
+            style = None
+        if style:
+            prefix = str(style.get("prompt_prefix") or "").strip()
+            if prefix:
+                parts.append(prefix)
+    project = get_project(str(asset["project_id"]))
+    standard = str(project.get("standard_prompt") or "").strip()
+    if standard:
+        parts.append(standard)
+    description = str(asset.get("description") or "").strip()
+    if description:
+        parts.append(description)
+    return ", ".join(parts)
 
 
 def resolve_seed(inputs: dict[str, Any]) -> dict[str, Any]:

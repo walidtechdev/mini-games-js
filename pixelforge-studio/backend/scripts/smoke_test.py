@@ -23,6 +23,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app.comfy_client import gpu_summary  # noqa: E402
 from app.main import app  # noqa: E402
+from app.workflows import get_adapter  # noqa: E402
 from app.pixel_ops import cleanup_artifacts, pixelize_image, png_bytes  # noqa: E402
 
 
@@ -77,6 +78,67 @@ def main() -> None:
         health = client.get("/api/health")
         assert health.status_code == 200, health.text
         assert health.json()["status"] == "ok"
+
+        settings = client.get("/api/settings").json()
+        assert settings["comfyui_path"] == "/mnt/.storage/ComfyUI"
+        assert settings["default_model"] == "pixelArtDiffusionXL_spriteShaper.safetensors"
+        assert settings["default_lora"] == "pixel-art-xl-v1.1.safetensors"
+        offline_models = client.get("/api/comfy/models")
+        assert offline_models.status_code == 200, offline_models.text
+        offline_body = offline_models.json()
+        assert offline_body["source"] == "disk"
+        assert isinstance(offline_body["checkpoints"], list)
+        assert isinstance(offline_body["loras"], list)
+
+        install = TMP / "ComfyUI"
+        checkpoints = install / "models" / "checkpoints"
+        loras = install / "models" / "loras"
+        (checkpoints / "sdxl").mkdir(parents=True)
+        (checkpoints / "pixelArtDiffusionXL_spriteShaper.safetensors").write_bytes(b"ckpt")
+        (checkpoints / "sdxl" / "sdXL_v10VAEFix.safetensors").write_bytes(b"ckpt")
+        (checkpoints / "notes.txt").write_text("skip", encoding="utf-8")
+        (checkpoints / "put_checkpoints_here").write_bytes(b"")
+        loras.mkdir(parents=True)
+        (loras / "pixel-art-xl-v1.1.safetensors").write_bytes(b"lora")
+        saved_path = client.put("/api/settings", json={"comfyui_path": str(install)})
+        assert saved_path.status_code == 200, saved_path.text
+        catalog = client.get("/api/comfy/models")
+        assert catalog.status_code == 200, catalog.text
+        listed = catalog.json()
+        assert listed["source"] == "disk"
+        assert listed["checkpoints"] == [
+            "pixelArtDiffusionXL_spriteShaper.safetensors",
+            "sdxl/sdXL_v10VAEFix.safetensors",
+        ]
+        assert listed["loras"] == ["pixel-art-xl-v1.1.safetensors"]
+        missing_path = client.put("/api/settings", json={"comfyui_path": str(TMP / "missing-comfy")})
+        assert missing_path.status_code == 200, missing_path.text
+        empty_catalog = client.get("/api/comfy/models")
+        assert empty_catalog.status_code == 200, empty_catalog.text
+        assert empty_catalog.json()["source"] == "disk"
+        assert empty_catalog.json()["checkpoints"] == []
+        assert empty_catalog.json()["loras"] == []
+
+        upscale = get_adapter("upscale").build_workflow(
+            {
+                "comfy_image": "sprite.png",
+                "asset_slug": "knight",
+                "upscale_model": "RealESRGAN_x4plus_anime_6B.pth",
+            },
+            settings,
+        )
+        upscale_types = [node["class_type"] for node in upscale.values()]
+        assert "UpscaleModelLoader" in upscale_types
+        assert "ImageUpscaleWithModel" in upscale_types
+        assert "ImageScale" not in upscale_types
+        assert any(
+            node.get("inputs", {}).get("model_name") == "RealESRGAN_x4plus_anime_6B.pth" for node in upscale.values()
+        )
+        cutout = get_adapter("background_removal").build_workflow(
+            {"comfy_image": "sprite.png", "asset_slug": "knight"},
+            settings,
+        )
+        assert any(node.get("class_type") == "RMBG" for node in cutout.values())
 
         workflows = client.get("/api/workflows").json()
         ids = {item["id"] for item in workflows}
@@ -207,6 +269,59 @@ def main() -> None:
         connection = client.post("/api/settings/test-comfy").json()
         assert connection["status"] == "Offline"
         assert "ComfyUI is not running" in connection["message"]
+
+        style = styles[0]
+        standard = client.patch(
+            f"/api/projects/{project['id']}",
+            json={"standard_prompt": "clean pixels, transparent background"},
+        )
+        assert standard.status_code == 200, standard.text
+        assert standard.json()["standard_prompt"] == "clean pixels, transparent background"
+        described = client.patch(
+            f"/api/assets/{asset['id']}",
+            json={"description": "a knight in blue armor"},
+        )
+        assert described.status_code == 200, described.text
+        composed = client.post(
+            "/api/generate",
+            json={
+                "asset_id": asset["id"],
+                "workflow_id": "txt2sprite",
+                "style_id": style["id"],
+                "inputs": {"prompt": "SHOULD NOT WIN", "width": 64, "height": 64},
+            },
+        )
+        assert composed.status_code == 200, composed.text
+        composed_job = wait_job(client, composed.json()["id"])
+        assert composed_job["status"] == "failed"
+        prompt = composed_job["params"]["prompt"]
+        assert "SHOULD NOT WIN" not in prompt
+        assert prompt.index(style["prompt_prefix"]) < prompt.index("clean pixels, transparent background")
+        assert prompt.index("clean pixels, transparent background") < prompt.index("a knight in blue armor")
+
+        imported = client.post(
+            f"/api/assets/{asset['id']}/versions/upload",
+            files={"file": ("outside.png", io.BytesIO(png), "image/png")},
+            data={"kind": "import", "prompt": "external sprite"},
+        )
+        assert imported.status_code == 200, imported.text
+        imported_version = imported.json()
+        assert imported_version["kind"] == "import"
+        facing = client.post(
+            "/api/directions",
+            json={
+                "asset_id": asset["id"],
+                "directions": ["left"],
+                "style_id": style["id"],
+                "inputs": {"image": f"version:{imported_version['id']}", "width": 64, "height": 64},
+            },
+        )
+        assert facing.status_code == 200, facing.text
+        facing_job = wait_job(client, facing.json()[0]["id"])
+        assert facing_job["status"] == "failed"
+        assert facing_job["params"]["image"] == f"version:{imported_version['id']}"
+        assert "left side view, facing left" in facing_job["params"]["prompt"]
+        assert "a knight in blue armor" in facing_job["params"]["prompt"]
 
         logs = client.get("/api/logs").json()
         assert logs

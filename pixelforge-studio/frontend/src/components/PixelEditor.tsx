@@ -4,6 +4,7 @@ import { PALETTE, PixelBuffer, ZOOM_STEPS, sameColor, zoomPercent, type RGBA } f
 import { latestFrames } from "../lib/format";
 import { run, useStudio } from "../store";
 import { ANIMATIONS } from "../types";
+import { DropImage } from "./DropImage";
 import { Button } from "./ui";
 
 type Tool = "pencil" | "eraser" | "fill" | "picker" | "rect" | "select" | "move";
@@ -369,6 +370,18 @@ export function PixelEditor() {
     });
   }
 
+  async function openFile(file: File): Promise<void> {
+    if (dirtyRef.current && !window.confirm("Discard unsaved pixels and load this image?")) return;
+    const buffer = await PixelBuffer.fromFile(file);
+    bufferRef.current = buffer;
+    undoRef.current = [];
+    redoRef.current = [];
+    dirtyRef.current = true;
+    selectionRef.current = null;
+    setSelection(null);
+    bump();
+  }
+
   function newCanvas(): void {
     if (dirtyRef.current && !window.confirm("Discard unsaved pixels?")) return;
     bufferRef.current = PixelBuffer.create(blankW, blankH);
@@ -427,15 +440,17 @@ export function PixelEditor() {
             </Button>
           </span>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto bg-ink p-4">
-          <canvas
-            ref={canvasRef}
-            className="cursor-crosshair touch-none"
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-          />
-        </div>
+        <DropImage className="min-h-0 flex-1 overflow-auto bg-ink" label="Drop a PNG, WebP, or JPEG to open it in the editor" onFile={(file) => void openFile(file)}>
+          <div className="p-4">
+            <canvas
+              ref={canvasRef}
+              className="cursor-crosshair touch-none"
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+            />
+          </div>
+        </DropImage>
         <div className="flex items-center gap-2 border-t border-line px-3 py-2">
           <span className="h-6 w-6 rounded border border-line" style={{ background: `rgba(${color[0]},${color[1]},${color[2]},${color[3] / 255})` }} />
           <span className="text-[11px] text-mist">From</span>

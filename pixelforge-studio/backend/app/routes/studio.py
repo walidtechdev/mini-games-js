@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
@@ -12,6 +13,7 @@ from pydantic import BaseModel, Field
 from app.comfy_client import ComfyClient, ComfyOfflineError, gpu_summary
 from app.config import COMFY_OFFLINE_MESSAGE
 from app.jobs import job_manager
+from app.models_catalog import list_disk_models
 from app.pixel_ops import blank_image, dumps_sheet, open_rgba, pack_spritesheet, png_bytes
 from app.repository import (
     ANIMATION_PHRASES,
@@ -21,6 +23,7 @@ from app.repository import (
     abs_from_storage,
     add_reference,
     apply_style,
+    compose_prompt,
     create_asset,
     create_category,
     create_job,
@@ -59,6 +62,7 @@ from app.repository import (
     set_approved,
     set_primary,
     update_asset,
+    update_project,
     update_style,
     update_version_meta,
 )
@@ -72,6 +76,12 @@ DURATION_DEFAULTS = {"idle": 150, "walk": 120, "run": 80, "attack": 100, "hurt":
 class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     description: str = ""
+
+
+class ProjectUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    standard_prompt: str | None = None
 
 
 class CategoryCreate(BaseModel):
@@ -168,6 +178,7 @@ class SpriteSheetBody(BaseModel):
 
 class SettingsBody(BaseModel):
     comfyui_url: str | None = None
+    comfyui_path: str | None = None
     storage_dir: str | None = None
     default_workflow: str | None = None
     default_model: str | None = None
@@ -190,9 +201,22 @@ def _asset_or_404(asset_id: str) -> dict[str, Any]:
         raise _missing(exc) from exc
 
 
+_IMAGE_TYPES = {"image/png", "image/webp", "image/jpeg"}
+_IMAGE_SUFFIXES = {".png", ".webp", ".jpg", ".jpeg"}
+
+
+def _require_image_upload(upload: UploadFile) -> None:
+    suffix = Path(upload.filename or "").suffix.lower()
+    content_type = (upload.content_type or "").split(";")[0].strip().lower()
+    if suffix in _IMAGE_SUFFIXES or content_type in _IMAGE_TYPES:
+        return
+    raise HTTPException(status_code=400, detail="Only PNG, WebP, and JPEG images are accepted.")
+
+
 def _prepare_inputs(asset: dict[str, Any], inputs: dict[str, Any], style_id: str | None) -> dict[str, Any]:
     settings = effective_settings()
     merged = apply_style(dict(inputs), style_id)
+    merged["prompt"] = compose_prompt(asset, style_id)
     merged = resolve_seed(merged)
     if not merged.get("model"):
         merged["model"] = settings["default_model"]
@@ -267,6 +291,15 @@ def post_project(body: ProjectCreate) -> dict[str, Any]:
 def project_detail(project_id: str) -> dict[str, Any]:
     try:
         project = get_project(project_id)
+    except KeyError as exc:
+        raise _missing(exc) from exc
+    return {**project, "categories": list_categories(project_id)}
+
+
+@router.patch("/projects/{project_id}")
+def patch_project(project_id: str, body: ProjectUpdate) -> dict[str, Any]:
+    try:
+        project = update_project(project_id, body.model_dump(exclude_unset=True))
     except KeyError as exc:
         raise _missing(exc) from exc
     return {**project, "categories": list_categories(project_id)}
@@ -351,6 +384,7 @@ async def post_reference(
     label: str = Form("concept"),
 ) -> dict[str, Any]:
     _asset_or_404(asset_id)
+    _require_image_upload(file)
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="The reference file is empty.")
@@ -382,23 +416,25 @@ async def upload_version(
     parent_version_id: str | None = Form(None),
 ) -> dict[str, Any]:
     _asset_or_404(asset_id)
+    _require_image_upload(file)
     data = await file.read()
     try:
         png = ensure_png(data)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    stored_kind = kind or "edit"
     return save_version_png(
         asset_id,
         png,
-        kind=kind or "edit",
+        kind=stored_kind,
         prompt=prompt,
-        workflow_id="editor" if kind == "edit" else kind,
+        workflow_id="editor" if stored_kind in {"edit", "import"} else stored_kind,
         parent_version_id=parent_version_id,
         direction=direction,
         animation_name=animation_name,
         frame_index=frame_index,
         duration_ms=duration_ms,
-        parameters={"source": "pixel-editor"},
+        parameters={"source": "import" if stored_kind == "import" else "pixel-editor"},
     )
 
 
@@ -678,6 +714,26 @@ def get_settings_route() -> dict[str, Any]:
 @router.put("/settings")
 def put_settings(body: SettingsBody) -> dict[str, Any]:
     return save_settings(body.model_dump(exclude_unset=True))
+
+
+@router.get("/comfy/models")
+async def comfy_models() -> dict[str, Any]:
+    settings = effective_settings()
+    install_path = str(settings["comfyui_path"])
+    client = ComfyClient(settings["comfyui_url"], settings["comfy_client_id"] or "pixelforge")
+    try:
+        checkpoints = await client.list_model_folder("checkpoints")
+        loras = await client.list_model_folder("loras")
+        source = "comfyui"
+    except ComfyOfflineError:
+        checkpoints, loras = list_disk_models(install_path)
+        source = "disk"
+    return {
+        "source": source,
+        "checkpoints": checkpoints,
+        "loras": loras,
+        "install_path": install_path,
+    }
 
 
 @router.post("/settings/test-comfy")

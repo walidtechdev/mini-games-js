@@ -1,31 +1,37 @@
 from app.workflow_support import WorkflowAdapter, diffusion_values, field, load_workflow
 
+UPSCALE_MODELS = [
+    "RealESRGAN_x4plus_anime_6B.pth",
+    "4x-UltraSharp.pth",
+    "RealESRGAN_x4.pth",
+    "4x_NMKD-Superscale-SP_178000_G.pth",
+    "OmniSR_X2_DIV2K.safetensors",
+    "OmniSR_X3_DIV2K.safetensors",
+    "OmniSR_X4_DIV2K.safetensors",
+]
+
 
 class Adapter(WorkflowAdapter):
     id = "upscale"
     name = "Upscale"
-    description = "Scale a sprite through ComfyUI ImageScale. Swap workflow.json for an ESRGAN or Ultimate SD Upscale graph if you want a model upscale."
+    description = (
+        "Upscale with ComfyUI's UpscaleModelLoader and ImageUpscaleWithModel. "
+        "The default weight is RealESRGAN_x4plus_anime_6B.pth."
+    )
 
     def inputs_schema(self) -> list[dict]:
         return [
             field("image", "Image", "image", required=True),
-            field("scale", "Scale", "number", default=2, min=1, max=8, step=1),
             field(
-                "method",
-                "Method",
+                "upscale_model",
+                "Upscale model",
                 "select",
-                default="nearest-exact",
-                options=["nearest-exact", "lanczos", "bicubic", "bilinear", "area"],
+                default="RealESRGAN_x4plus_anime_6B.pth",
+                options=UPSCALE_MODELS,
             ),
         ]
 
     def build_workflow(self, inputs: dict, settings: dict) -> dict:
-        scale = max(1, int(inputs.get("scale") or 2))
-        width = int(inputs.get("source_width") or inputs.get("width") or 64) * scale
-        height = int(inputs.get("source_height") or inputs.get("height") or 64) * scale
-        enriched = dict(inputs)
-        enriched["width"] = width
-        enriched["height"] = height
         slug = inputs.get("asset_slug") or "upscale"
-        values, _keep = diffusion_values(enriched, settings, f"pixelforge/{slug}_upscale")
+        values, _keep = diffusion_values(inputs, settings, f"pixelforge/{slug}_upscale")
         return load_workflow(self.workflow_path(), values, keep_lora=False)

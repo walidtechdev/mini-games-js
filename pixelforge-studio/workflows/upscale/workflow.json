@@ -5,19 +5,21 @@
     "_meta": { "title": "Source Image" }
   },
   "2": {
-    "class_type": "ImageScale",
-    "inputs": {
-      "upscale_method": "__METHOD__",
-      "width": "__WIDTH__",
-      "height": "__HEIGHT__",
-      "crop": "disabled",
-      "image": ["1", 0]
-    },
-    "_meta": { "title": "Scale" }
+    "class_type": "UpscaleModelLoader",
+    "inputs": { "model_name": "__UPSCALE_MODEL__" },
+    "_meta": { "title": "Upscale Model" }
   },
   "3": {
+    "class_type": "ImageUpscaleWithModel",
+    "inputs": {
+      "upscale_model": ["2", 0],
+      "image": ["1", 0]
+    },
+    "_meta": { "title": "Upscale Image" }
+  },
+  "4": {
     "class_type": "SaveImage",
-    "inputs": { "filename_prefix": "__FILENAME__", "images": ["2", 0] },
+    "inputs": { "filename_prefix": "__FILENAME__", "images": ["3", 0] },
     "_meta": { "title": "Save Image" }
   }
 }

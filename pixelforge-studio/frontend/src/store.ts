@@ -6,6 +6,7 @@ import type {
   DevLog,
   GpuInfo,
   Job,
+  ModelCatalog,
   Project,
   ProjectDetail,
   Settings,
@@ -38,6 +39,10 @@ type StudioState = {
   compareOpen: boolean;
   comfyStatus: "unknown" | "Connected" | "Offline";
   gpu: GpuInfo | null;
+  models: ModelCatalog | null;
+  formDrafts: Record<string, Record<string, string>>;
+  workflowByAsset: Record<string, string>;
+  masters: Record<string, { directions?: string; animation?: string }>;
   boot: () => Promise<void>;
   openProject: (id: string) => Promise<void>;
   refreshAssets: () => Promise<void>;
@@ -58,6 +63,14 @@ type StudioState = {
   setSettings: (settings: Settings) => void;
   setStyles: (styles: Style[]) => void;
   setProjects: (projects: Project[]) => void;
+  refreshModels: () => Promise<void>;
+  patchAsset: (patch: Partial<AssetDetail>) => void;
+  patchProject: (project: Project) => void;
+  ensureDraft: (key: string, values: Record<string, string>) => void;
+  patchDraft: (key: string, field: string, value: string) => void;
+  writeDraft: (key: string, values: Record<string, string>) => void;
+  setAssetWorkflow: (assetId: string, workflowId: string) => void;
+  setMaster: (assetId: string, tool: "directions" | "animation", versionId: string) => void;
 };
 
 let socket: WebSocket | null = null;
@@ -92,6 +105,10 @@ export const useStudio = create<StudioState>((set, get) => ({
   compareOpen: false,
   comfyStatus: "unknown",
   gpu: null,
+  models: null,
+  formDrafts: {},
+  workflowByAsset: {},
+  masters: {},
 
   pushToast: (message, tone = "info") => {
     const id = crypto.randomUUID();
@@ -108,6 +125,44 @@ export const useStudio = create<StudioState>((set, get) => ({
   setSettings: (settings) => set({ settings }),
   setStyles: (styles) => set({ styles }),
   setProjects: (projects) => set({ projects }),
+  refreshModels: async () => {
+    const models = await api.comfyModels();
+    set({ models });
+  },
+  patchAsset: (patch) =>
+    set((state) => {
+      if (!state.asset) return {};
+      const asset = { ...state.asset, ...patch };
+      return {
+        asset,
+        assets: state.assets.map((item) => (item.id === asset.id ? { ...item, ...patch } : item)),
+      };
+    }),
+  patchProject: (project) =>
+    set((state) => ({
+      project:
+        state.project && state.project.id === project.id
+          ? { ...state.project, ...project, categories: state.project.categories }
+          : state.project,
+      projects: state.projects.map((item) => (item.id === project.id ? { ...item, ...project } : item)),
+    })),
+  ensureDraft: (key, values) =>
+    set((state) => (state.formDrafts[key] ? state : { formDrafts: { ...state.formDrafts, [key]: values } })),
+  patchDraft: (key, field, value) =>
+    set((state) => {
+      const current = state.formDrafts[key] ?? {};
+      return { formDrafts: { ...state.formDrafts, [key]: { ...current, [field]: value } } };
+    }),
+  writeDraft: (key, values) => set((state) => ({ formDrafts: { ...state.formDrafts, [key]: values } })),
+  setAssetWorkflow: (assetId, workflowId) =>
+    set((state) => ({ workflowByAsset: { ...state.workflowByAsset, [assetId]: workflowId } })),
+  setMaster: (assetId, tool, versionId) =>
+    set((state) => ({
+      masters: {
+        ...state.masters,
+        [assetId]: { ...state.masters[assetId], [tool]: versionId },
+      },
+    })),
   selectVersion: (id, compare = false) => {
     if (compare && id) {
       set({ compareVersionId: id });
@@ -153,6 +208,9 @@ export const useStudio = create<StudioState>((set, get) => ({
       ]);
       remember(jobs);
       set({ projects, styles, workflows, settings, jobs, logs });
+      void get()
+        .refreshModels()
+        .catch(() => undefined);
       connectSocket();
       const stored = localStorage.getItem(PROJECT_KEY) || settings.default_project_id;
       if (stored && projects.some((project) => project.id === stored)) {

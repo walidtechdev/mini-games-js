@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { latestFrames } from "../lib/format";
+import { latestFrames, versionLabel } from "../lib/format";
 import { run, useStudio } from "../store";
 import { ANIMATIONS, DIRECTIONS_4, DIRECTIONS_8 } from "../types";
+import { DropImage } from "./DropImage";
+import { PromptParts, usePersistedPrompts } from "./PromptParts";
 import { Button, SelectInput, TextInput } from "./ui";
 
 export function AnimationPanel() {
@@ -15,12 +17,14 @@ export function AnimationPanel() {
   const [chosen, setChosen] = useState<string[]>(["front"]);
   const [facing, setFacing] = useState("front");
   const [frameCount, setFrameCount] = useState(6);
-  const [prompt, setPrompt] = useState("pixel art sprite, consistent character");
   const [cursor, setCursor] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [loop, setLoop] = useState(true);
   const [onion, setOnion] = useState(true);
 
+  const masters = useStudio((state) => state.masters);
+  const setMaster = useStudio((state) => state.setMaster);
+  const prompts = usePersistedPrompts();
   const frames = asset ? latestFrames(asset.versions, animation, facing) : [];
   const frame = frames[cursor] ?? null;
   const previous = cursor > 0 ? frames[cursor - 1] : null;
@@ -65,7 +69,10 @@ export function AnimationPanel() {
   });
 
   if (!asset) return null;
-  const master = asset.versions.find((version) => version.id === (selectedId || asset.primary_version_id));
+  const storedId = masters[asset.id]?.animation;
+  const master =
+    asset.versions.find((version) => version.id === storedId) ??
+    asset.versions.find((version) => version.id === (selectedId || asset.primary_version_id));
   const options = eight ? DIRECTIONS_8 : DIRECTIONS_4;
 
   function toggleDirection(direction: string): void {
@@ -126,6 +133,7 @@ export function AnimationPanel() {
           disabled={!master || chosen.length === 0}
           onClick={() =>
             void run(async () => {
+              await prompts.flush();
               await api.animation({
                 asset_id: asset.id,
                 animation,
@@ -134,7 +142,6 @@ export function AnimationPanel() {
                 style_id: asset.style_id,
                 inputs: {
                   image: `version:${master?.id}`,
-                  prompt,
                   width: master && master.width > 32 ? master.width : 512,
                   height: master && master.height > 32 ? master.height : 512,
                 },
@@ -145,6 +152,49 @@ export function AnimationPanel() {
           Generate frames
         </Button>
       </div>
+      <div className="mb-4 grid gap-3 md:grid-cols-[220px_1fr]">
+        <DropImage
+          label="Drop an animation source, or choose a file"
+          onFile={(file) =>
+            void run(async () => {
+              const version = await api.uploadVersion(asset.id, file, { kind: "import", prompt: file.name });
+              await refreshAsset();
+              selectVersion(version.id);
+              setMaster(asset.id, "animation", version.id);
+            })
+          }
+        >
+          <div className="checker m-2 flex aspect-square items-center justify-center">
+            {master ? <img src={master.url} alt="" className="max-h-full max-w-full object-contain" /> : <span className="text-xs text-mist">No source</span>}
+          </div>
+        </DropImage>
+        <div className="grid content-start gap-3">
+          <label className="text-xs text-mist">
+            Source version
+            <SelectInput
+              className="mt-1"
+              value={master?.id ?? ""}
+              onChange={(event) => {
+                if (event.target.value) setMaster(asset.id, "animation", event.target.value);
+              }}
+            >
+              <option value="">Choose a version</option>
+              {asset.versions.map((version) => (
+                <option key={version.id} value={version.id}>
+                  {versionLabel(version)} · {version.kind}
+                </option>
+              ))}
+            </SelectInput>
+          </label>
+          <PromptParts
+            styleId={asset.style_id}
+            description={prompts.description}
+            standard={prompts.standard}
+            onDescription={prompts.setDescription}
+            onStandard={prompts.setStandard}
+          />
+        </div>
+      </div>
       <div className="mb-3 flex flex-wrap gap-2 text-xs">
         {options.map((direction) => (
           <label key={direction} className="flex items-center gap-1 rounded border border-line px-2 py-1">
@@ -153,7 +203,6 @@ export function AnimationPanel() {
           </label>
         ))}
       </div>
-      <textarea className="mb-4 w-full rounded-md border border-line bg-ink px-3 py-2 text-sm" rows={2} value={prompt} onChange={(event) => setPrompt(event.target.value)} />
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="text-xs text-mist">Timeline · {facing}</span>
         {options.map((direction) => (
@@ -187,7 +236,7 @@ export function AnimationPanel() {
                 <input
                   className="hidden"
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/webp,image/jpeg,.png,.webp,.jpg,.jpeg"
                   onChange={(event) => {
                     const file = event.target.files?.[0];
                     event.target.value = "";

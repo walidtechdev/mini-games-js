@@ -60,6 +60,22 @@ class ComfyClient:
         except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
             raise ComfyOfflineError(repr(exc)) from exc
 
+    async def list_model_folder(self, folder: str) -> list[str]:
+        """Filenames from ComfyUI GET /models/{folder}. Raises ComfyOfflineError if it cannot answer."""
+        try:
+            async with httpx.AsyncClient(timeout=5) as http:
+                response = await http.get(f"{self.base_url}/models/{folder}")
+                response.raise_for_status()
+                data = response.json()
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
+            raise ComfyOfflineError(repr(exc)) from exc
+        except httpx.HTTPStatusError as exc:
+            raise ComfyOfflineError(exc.response.text[:500]) from exc
+        if not isinstance(data, list):
+            return []
+        names = [str(item).strip() for item in data if str(item).strip()]
+        return sorted(set(names), key=str.lower)
+
     async def upload_image(self, path: Path, filename: str) -> str:
         try:
             async with httpx.AsyncClient(timeout=60) as http:
