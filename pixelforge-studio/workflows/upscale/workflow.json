@@ -1,0 +1,23 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "__IMAGE__" },
+    "_meta": { "title": "Source Image" }
+  },
+  "2": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "upscale_method": "__METHOD__",
+      "width": "__WIDTH__",
+      "height": "__HEIGHT__",
+      "crop": "disabled",
+      "image": ["1", 0]
+    },
+    "_meta": { "title": "Scale" }
+  },
+  "3": {
+    "class_type": "SaveImage",
+    "inputs": { "filename_prefix": "__FILENAME__", "images": ["2", 0] },
+    "_meta": { "title": "Save Image" }
+  }
+}

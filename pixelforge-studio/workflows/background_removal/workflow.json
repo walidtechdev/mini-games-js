@@ -1,0 +1,28 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "__IMAGE__" },
+    "_meta": { "title": "Source Image" }
+  },
+  "2": {
+    "class_type": "RMBG",
+    "inputs": {
+      "image": ["1", 0],
+      "model": "RMBG-2.0",
+      "sensitivity": 1.0,
+      "process_res": 1024,
+      "mask_blur": 0,
+      "mask_offset": 0,
+      "invert_output": false,
+      "refine_foreground": false,
+      "background": "Alpha",
+      "background_color": "#000000"
+    },
+    "_meta": { "title": "Remove background — replace this graph with your install's API export" }
+  },
+  "3": {
+    "class_type": "SaveImage",
+    "inputs": { "filename_prefix": "__FILENAME__", "images": ["2", 0] },
+    "_meta": { "title": "Save Image" }
+  }
+}
