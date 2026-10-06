@@ -1,0 +1,25 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "__IMAGE__" },
+    "_meta": { "title": "Source Image" }
+  },
+  "2": {
+    "class_type": "UpscaleModelLoader",
+    "inputs": { "model_name": "__UPSCALE_MODEL__" },
+    "_meta": { "title": "Upscale Model" }
+  },
+  "3": {
+    "class_type": "ImageUpscaleWithModel",
+    "inputs": {
+      "upscale_model": ["2", 0],
+      "image": ["1", 0]
+    },
+    "_meta": { "title": "Upscale Image" }
+  },
+  "4": {
+    "class_type": "SaveImage",
+    "inputs": { "filename_prefix": "__FILENAME__", "images": ["3", 0] },
+    "_meta": { "title": "Save Image" }
+  }
+}
